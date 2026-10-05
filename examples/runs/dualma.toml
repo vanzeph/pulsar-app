@@ -1,0 +1,17 @@
+# Example run configuration (assembly example from the Pulsar architecture
+# baseline). Credentials are always referenced by environment-variable name;
+# never write plaintext credentials into a configuration file.
+
+[run]
+mode = "research"                 # research | paper | live
+
+[data]
+sources = ["akshare", "baostock"] # 主备顺序
+lake_dir = "./data/lake"
+
+[exec]
+venue = "backtest"                # backtest | paper | miniqmt
+
+[exec.miqmt]                      # 仅 Live 装配；默认锁定
+unlock_env = "PULSAR_LIVE_CONFIRM"
+max_order_value_cny = 50000.0

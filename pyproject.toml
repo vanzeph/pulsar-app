@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pulsar-app"
+version = "0.1.0"
+description = "Pulsar runtime assembly: TOML-driven configuration, plugin registry, run assembly and the research/paper/live CLI."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "vanzeph" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5,<3",
+    "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "mypy>=1.8",
+    "pandas-stubs>=2",
+]
+
+[project.urls]
+Repository = "https://github.com/vanzeph/pulsar-app"
+
+[project.scripts]
+pulsar = "pulsar_app.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pulsar_app"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = "pulsar_contracts.*"
+ignore_missing_imports = true
