@@ -85,3 +85,42 @@ jobs:
 
       - name: Topology check (pulsar-app)
         run: python /tmp/pulsar-contracts/tools/check_topology.py --repo "$GITHUB_WORKSPACE"
+
+  e2e:
+    name: free-source e2e chain (fixtures, offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install app with the pinned domain stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,e2e]"
+
+      - name: Fixture inventory (recorded free-source snapshots)
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("tests/e2e/fixtures/free-sources")
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          print("window:", manifest["window"])
+          print("akshare symbols:", len(manifest["akshare"]["symbols"]))
+          print("baostock symbols:", len(manifest["baostock"]["symbols"]))
+          files = sum(1 for _ in root.rglob("*.csv"))
+          size_mb = sum(f.stat().st_size for f in root.rglob("*") if f.is_file()) / 1e6
+          print(f"fixture files: {files} csv, {size_mb:.1f} MB total")
+          assert files > 60, "fixture set looks truncated"
+          PY
+
+      - name: E2E suite (backfill -> training -> backtest -> paper -> artifacts -> reproducibility)
+        run: python -m pytest tests/e2e -v
+
+      - name: Full suite (e2e included, proving one command runs it all)
+        run: python -m pytest

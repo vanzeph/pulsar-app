@@ -136,7 +136,54 @@ src/pulsar_app/
     cli.py         # research / paper / live
 examples/runs/     # example configurations
 tests/             # pytest suite (mock ports live here, never in the package)
+tests/e2e/         # free-source end-to-end acceptance chain (task A9)
+tools/             # offline maintenance scripts
 ```
+
+## End-to-end acceptance chain (free data sources)
+
+`tests/e2e/` holds the cross-repo acceptance suite proving the delivered
+stack assembles into one **offline** chain over the free sources
+(AkShare primary, baostock backup):
+
+```
+fixtures (recorded once from the live free endpoints)
+  -> akshare adapter -> ingestion pipeline -> temp lake
+       (completeness: zero unexplained bar gaps vs the calendar)
+  -> baostock backup path (cross-validation + router failover drill)
+  -> experiment TOML -> C3 factor pipeline (training)
+  -> research backtest over BacktestVenue (fills, fees, T+1)
+  -> paper session over PaperBroker (snapshots synthesized from bars)
+  -> run artifacts (run_manifest.json + events.parquet + metrics_report.json)
+  -> reproducibility: same config twice -> bit-identical manifests,
+     journals, fills and net-value curves
+```
+
+The suite asserts **engineering structure only** — no return / Sharpe /
+drawdown threshold appears anywhere (that exclusion is deliberate and
+documented in the test module header).
+
+Install and run:
+
+```bash
+pip install -e ".[dev,e2e]"     # pins the delivered pulsar-core/data/exec heads
+python -m pytest tests/e2e      # offline, seconds, never touches the network
+```
+
+Fixtures live in `tests/e2e/fixtures/free-sources/` (recorded raw frames:
+25 CSI300-sample symbols over 2024 including one 2024 dividend+conversion
+sample and one 2024 IPO, plus 6 dual-source baostock recordings). To
+re-record them from the live endpoints — manual, network required, CI
+never does this:
+
+```bash
+pip install -e ".[e2e-recorder]"
+python tools/make_e2e_fixtures.py --start 2024-01-01 --end 2024-12-31
+```
+
+The script re-runs the offline self-checks after recording (zero gaps,
+dividend/split coverage, akshare/baostock close agreement) so a fresh
+recording either keeps the properties the suite asserts or fails loudly.
 
 ## License
 

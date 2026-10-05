@@ -33,6 +33,20 @@ dev = [
     "mypy>=1.8",
     "pandas-stubs>=2",
 ]
+# The delivered domain stack the e2e chain assembles (task A9): pinned to
+# the six-repo main heads under test; pulsar-contracts is pinned in
+# [project.dependencies] to the same short ref every downstream repo
+# declares (its main head only added repo tooling, not package code).
+e2e = [
+    "pulsar-core @ git+https://github.com/vanzeph/pulsar-core.git@c9461f731dfcd0831cfdf5b0c97c363257156346",
+    "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@311eb6c1e8e7326a0165b41b5694774711c10a90",
+    "pulsar-exec @ git+https://github.com/vanzeph/pulsar-exec.git@92ffb4856df991ca0bace06d132b5218a56ff542",
+]
+# Network-only extras for tools/make_e2e_fixtures.py (recording, never CI).
+e2e-recorder = [
+    "akshare>=1.14",
+    "baostock>=0.8",
+]
 
 [project.urls]
 Repository = "https://github.com/vanzeph/pulsar-app"

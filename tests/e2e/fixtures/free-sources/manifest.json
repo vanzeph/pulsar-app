@@ -1,0 +1,50 @@
+{
+  "recorded_at": "2026-10-05T23:36:10.113006+00:00",
+  "window": [
+    "2024-01-01",
+    "2024-12-31"
+  ],
+  "akshare": {
+    "symbols": [
+      "SH600519",
+      "SH600036",
+      "SH601318",
+      "SH600276",
+      "SH601899",
+      "SH603288",
+      "SH601127",
+      "SH600900",
+      "SH601088",
+      "SH601012",
+      "SZ000001",
+      "SZ000858",
+      "SZ002415",
+      "SZ002594",
+      "SZ000651",
+      "SZ003816",
+      "SZ000333",
+      "SZ300750",
+      "SZ300059",
+      "SZ300760",
+      "SZ300896",
+      "SH688981",
+      "SH688111",
+      "SH688012",
+      "SZ301536"
+    ],
+    "via": "pulsar_data LiveAkShareClient (eastmoney primary, sina fallback)",
+    "failed_symbols": []
+  },
+  "baostock": {
+    "symbols": [
+      "SH600519",
+      "SZ000001",
+      "SZ300750",
+      "SH688111",
+      "SZ300896",
+      "SZ301536"
+    ],
+    "via": "pulsar_data LiveBaostockClient (anonymous login)",
+    "failed_symbols": []
+  }
+}

@@ -1,0 +1,42 @@
+# Dedicated e2e experiment of the free-source acceptance chain (task A9).
+#
+# Engineering-correctness only: this document exists to prove the C3
+# layered-config pipeline (registered factors + preprocess + model +
+# portfolio construction, all referenced from pure TOML) trains and
+# backtests over the fixture lake. No performance threshold is attached
+# to it anywhere.
+#
+# Universe = exactly the fixture symbol set recorded by
+# tools/make_e2e_fixtures.py (tests/e2e/fixtures/free-sources/manifest.json).
+
+[experiment]
+id = "e2e_free_source_2024"
+description = "e2e engineering check: momentum/low-vol/reversal, top-5 monthly"
+
+[universe]
+symbols = [
+    "SH600519", "SH600036", "SH601318", "SH600276", "SH601899",
+    "SH603288", "SH601127", "SH600900", "SH601088", "SH601012",
+    "SZ000001", "SZ000858", "SZ002415", "SZ002594", "SZ000651",
+    "SZ003816", "SZ000333", "SZ300750", "SZ300059", "SZ300760",
+    "SZ300896", "SH688981", "SH688111", "SH688012", "SZ301536",
+]
+
+[factors]
+names = ["momentum_20", "volatility_20", "reversal_5"]
+preprocess = ["winsorize", "zscore"]
+
+[model]
+type = "linear_score"
+params = { weights = { momentum_20 = 1.0, volatility_20 = 0.5, reversal_5 = 0.25 } }
+
+[portfolio]
+method = "top_n"
+top_n = 5
+rebalance = "monthly"
+
+[backtest]
+start = 2024-03-01
+end = 2024-12-31
+costs = "a_share_default"
+seed = 42
