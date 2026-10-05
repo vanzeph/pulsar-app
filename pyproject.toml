@@ -12,7 +12,7 @@ authors = [{ name = "vanzeph" }]
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5,<3",
-    "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git",
+    "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git@f385fbd",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
