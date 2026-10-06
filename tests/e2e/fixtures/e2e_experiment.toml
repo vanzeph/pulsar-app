@@ -12,6 +12,7 @@
 [experiment]
 id = "e2e_free_source_2024"
 description = "e2e engineering check: momentum/low-vol/reversal, top-5 monthly"
+status = "candidate"
 
 [universe]
 symbols = [
