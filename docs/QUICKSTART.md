@@ -195,7 +195,73 @@ register_factor(FactorDefinition(
 （`modelers.py` 的 `MODEL_REGISTRY`）与 universe（`register_universe`）
 的扩展同一模式。
 
-## 6. C6 上下线状态怎么改
+## 6. ML 模型器与 GPU 训练（可选 extra：pulsar-core[ml]）
+
+ML 能力是**可选 extra**：默认安装零 torch，`import pulsar_core` 与全部非
+ML 路径不受影响；只有用到 `mlp_torch` / `lstm_torch` 模型器时才需要装。
+
+### 6.1 安装 torch
+
+macOS / Linux（CPU 版，约 200MB）：
+
+```bash
+.venv/bin/pip install "pulsar-core[ml] @ git+https://github.com/vanzeph/pulsar-core.git@<锚点>"
+# 或本地克隆开发形态（与 §5 一致）：
+.venv/bin/pip install -e "repos/pulsar-core[ml]"
+```
+
+Windows + NVIDIA GPU（官方 CUDA 轮子，先装 torch 再装包，extra 即已满足）：
+
+```powershell
+.venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cu124
+.venv\Scripts\pip install -e "repos\pulsar-core[ml]"
+```
+
+（cu124 为 CUDA 12.4 轮子线；驱动 ≥ 525 即可，无需单独装 CUDA Toolkit——
+轮子自带 CUDA 运行时。装错线时 `torch.cuda.is_available()` 会是 False，
+详见 `docs/WINDOWS-READINESS.md` 的 GPU 部署节。）
+
+验证：
+
+```bash
+.venv/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+### 6.2 实验配置与设备选择
+
+`repos/pulsar-core/experiments/mlp_torch_example.toml` 是完整示例；模型器
+直接进 `[model] type`，参数全在 `params`：
+
+```toml
+[model]
+type = "mlp_torch"
+params = { device = "auto", epochs = 50, lr = 0.01, hidden = [16],
+           lookback = 120, horizon = 5, batch_size = 256, seed = 0 }
+```
+
+- `device`：`auto`（默认，有 CUDA 用 CUDA、否则 CPU）/ `cuda` / `cpu`；
+  强制 `cuda` 但不可用时**自动回退 CPU** 并写进训练环境记录，不中断运行。
+- `lstm_torch` 同一入口，多一个 `window`（滚动窗口长度）：序列样本 =
+  每标的过去 `window` 天的因子行序列。
+- 训练消费 FactorEngine 的预处理因子面板（标签为 `horizon` 日前瞻收益的
+  截面 z 分数），打分进既有组合管线——RiskGate 出口不可绕过。
+
+### 6.3 训练工件与"重跑不重训"
+
+给装配/演练入口传 `runs_root`（即本文的 `runs/` 目录）后：
+
+- 训练产物落 `runs/<run_id>/model_artifact/`：`weights.pt`（state_dict）+
+  `training_config.json`（参数/因子/标准化/环境）+ `artifact.json`
+  （逐文件 sha256）；RunManifest 增加 `model_artifact` 段
+  （路径 + 两个 hash + 训练环境）。
+- **同一 run_id 重跑不重训**：runner 先查 `runs/<run_id>/model_artifact/`，
+  命中即校验 sha256 后从钉版工件加载推理（origin 记为 `pinned`）；
+  要强制重训在 `params` 里写 `retrain = true`。
+- 确定性契约：CPU 训练/推理严格逐位一致（种子 + 确定性算法模式 +
+  环境记录入工件）；GPU 为尽力保证。篡改权重文件会在加载时被
+  sha256 校验拒绝，绝不带病推理。
+
+## 7. C6 上下线状态怎么改
 
 `experiment.status` 是装配层强校验的状态机：`candidate` 只能跑 research；
 `active` 才允许 paper / live；`retired` 只读复盘（拒绝重跑）。上下线是
@@ -218,7 +284,7 @@ retire_experiment(              # 下线 active -> retired（运行中会话立�
 可追溯）；实验文件不在 git 仓库里时该项记 `unknown`——这也是建议把
 `experiments/` 单独 git 化的原因。
 
-## 7. 一键复跑
+## 8. 一键复跑
 
 ```bash
 bash repos/pulsar-app/tools/drill_local.sh /path/to/pulsar-workspace

@@ -75,15 +75,48 @@ ui@30131ad）源码的 Windows 可移植性静态核查 + 依赖 wheel 可用性
 7. 冒烟验证：`pulsar --version`、`pulsar-data --help`、`python -m pulsar_ui.report
    <run_dir>`、`pulsar-ui --port 7800 --runs-dir runs --lake-dir data\lake`。
 
-## GPU 说明
+## GPU 部署（ML 模型器，ML1 已交付）
 
-当前模型器（`equal_weight` / `linear_score` / `ic_weighted`，见
-`pulsar-core/src/pulsar_core/modelers.py`）为纯统计实现，**纯 CPU 运行**，
-不引入任何 GPU/深度学习依赖（栈内无 torch/tensorflow/onnxruntime），
-Windows 部署对 GPU 无任何要求。GPU 能力属于未来 ML 模型器任务（GBDT/神经
-网络族）的预留项：届时按该任务的设计引入对应 wheel（torch 等）与本地
-训练/推理约定，模型文件按核心引擎设计作为策略资产纳入 RunManifest 版本
-管理，本次审查不预置任何 GPU 相关内容。
+> 本节由 ML1（ML 模型器与 GPU 训练能力）补充：`pulsar-core` 以 optional
+> extra `[ml]` 引入 torch，首批 `mlp_torch` / `lstm_torch` 模型器已进注册
+> 表；审查正文中的六仓锚点仍是 DR1 时点的静态核查对象。
+
+ML 栈在 Windows 上的部署要求（全部本地，无云依赖）：
+
+| 项 | 要求 | 说明 |
+|-|-|-|
+| GPU 驱动 | NVIDIA 驱动 ≥ 525（CUDA 12.x 轮子线） | 只需显卡驱动，**无需**单独安装 CUDA Toolkit / cuDNN——pip 轮子自带 CUDA 运行时 |
+| torch 轮子 | 官方 CUDA 轮子线（cu12x，如 cu124） | 必须用 `--index-url https://download.pytorch.org/whl/cu124`；误装 CPU 轮子或 PyPI 默认 linux 轮子会静默退回 CPU |
+| 安装顺序 | 先 torch 后 `pulsar-core[ml]` | 先装 torch（选定算力线），再装 `[ml]` extra 时依赖已满足，不会拉第二条 torch |
+
+部署命令（PowerShell）：
+
+```powershell
+.venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cu124
+.venv\Scripts\pip install -e "repos\pulsar-core[ml]"
+```
+
+验证两步（缺一不可）：
+
+```powershell
+nvidia-smi                                  # 驱动可见 GPU 与驱动版本
+.venv\Scripts\python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+# 期望：版本号 + True
+```
+
+- `nvidia-smi` 正常但 `torch.cuda.is_available()` 为 False：几乎总是轮子
+  线装错（CPU 轮子）或驱动过旧；重装对应 cu12x 轮子即可，无需动 Pulsar。
+- 设备配置：实验 TOML `model.params.device` = `auto`（默认）即"有 CUDA 用
+  CUDA、否则 CPU"；强制 `cuda` 而不可用时**自动回退 CPU** 并在训练环境
+  记录中注明（run 不中断、行为可见）。
+- 确定性契约（核心引擎设计"本地运行约束"）：训练开启确定性模式
+  （warn-only）并记录种子与环境（torch/CUDA 版本、device、GPU 名）；
+  **CPU 训练与推理严格逐位一致，GPU 为尽力保证**。训练产物
+  （权重 + 配置 + sha256）作为版本化工件落
+  `runs\<run_id>\model_artifact\`，RunManifest 带 `model_artifact` 段；
+  重跑同 run_id 从钉版工件校验加载、不重训（`retrain = true` 强制重训）。
+- 无 NVIDIA GPU 的 Windows 机器：CPU 轮子（`pip install torch` 默认即
+  CPU）+ `[ml]` extra 一样可用，路径分隔符由 `pathlib` 处理，无额外步骤。
 
 ## 审查方法学附注
 
