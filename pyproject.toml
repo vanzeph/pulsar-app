@@ -12,7 +12,7 @@ authors = [{ name = "vanzeph" }]
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5,<3",
-    "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git@f385fbd",
+    "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git@2e3e393",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -36,11 +36,11 @@ dev = [
 # The delivered domain stack the e2e chain assembles (task A9): pinned to
 # the six-repo main heads under test; pulsar-contracts is pinned in
 # [project.dependencies] to the same short ref every downstream repo
-# declares (its main head only added repo tooling, not package code).
+# declares (unified at 2e3e393 across core/exec/app/data).
 e2e = [
-    "pulsar-core @ git+https://github.com/vanzeph/pulsar-core.git@524dcc0cf4bf82a63dd6bcf803c4ce57178ccb32",
-    "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@702e4f86bf63c661eaa879311607ff689e4eb437",
-    "pulsar-exec @ git+https://github.com/vanzeph/pulsar-exec.git@92ffb4856df991ca0bace06d132b5218a56ff542",
+    "pulsar-core @ git+https://github.com/vanzeph/pulsar-core.git@8e5620e0b86fd11a8ee872e60463bb8204fb7339",
+    "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@99e093d247030eacbb185fc53cf7880fe266cfc0",
+    "pulsar-exec @ git+https://github.com/vanzeph/pulsar-exec.git@ab94f1ff81cabf9342d55e562e8f2c56f1408e6d",
 ]
 # Network-only extras for tools/make_e2e_fixtures.py (recording, never CI).
 e2e-recorder = [
