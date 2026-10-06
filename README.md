@@ -28,6 +28,13 @@ pip install -e .[dev]
 
 Python >= 3.11. Depends on `pydantic` and `pulsar-contracts` only.
 
+> **New here?** [`docs/QUICKSTART.md`](docs/QUICKSTART.md) walks a fresh
+> machine from a clean venv through data ingestion, a first experiment and
+> the report/dashboard; [`tools/drill_local.sh`](tools/drill_local.sh) is
+> that flow as one repeatable script, and
+> [`docs/WINDOWS-READINESS.md`](docs/WINDOWS-READINESS.md) is the Windows
+> portability review (deployment steps included).
+
 ## Run configuration
 
 ```toml
