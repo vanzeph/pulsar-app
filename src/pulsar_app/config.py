@@ -50,6 +50,7 @@ __all__ = [
     "RunSection",
     "DataSection",
     "ExecSection",
+    "StoreSection",
     "RunConfig",
     "ENV_REF_TEMPLATE",
     "parse_toml_config",
@@ -147,6 +148,30 @@ class DataSection(_Frozen):
         return value
 
 
+class StoreSection(_Frozen):
+    """The ``[store]`` section: unified-store objects this run assembles from.
+
+    ``root`` is the storage root (four-layer workspace layout: git repos
+    / store root / lake / runs). ``code`` names code objects materialized
+    and registered into the pulsar-core registries before assembly;
+    ``experiments`` names experiment objects whose content hashes are
+    pinned into the RunManifest (reproduce-by-hash). Names refer to the
+    *head* version at assembly time; the manifest records the resolved
+    hashes.
+    """
+
+    root: str = "./store"
+    code: tuple[str, ...] = Field(default_factory=tuple)
+    experiments: tuple[str, ...] = Field(default_factory=tuple)
+
+    @field_validator("code", "experiments")
+    @classmethod
+    def _store_names_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("store object names must be unique within their list")
+        return value
+
+
 class ExecSection(_Frozen):
     """The ``[exec]`` section: venue id plus optional per-venue parameter tables."""
 
@@ -160,6 +185,7 @@ class RunConfig(_Frozen):
     run: RunSection = Field(default_factory=RunSection)
     data: DataSection
     exec: ExecSection
+    store: StoreSection = Field(default_factory=StoreSection)
 
     def with_mode(self, mode: RunMode) -> "RunConfig":
         """Return a copy with ``run.mode`` set to ``mode``.
@@ -295,8 +321,9 @@ def _resolve_string(value: str, env: Mapping[str, str]) -> str:
     return env[name]
 
 
-_ROOT_SECTIONS = ("run", "data", "exec")
+_ROOT_SECTIONS = ("run", "data", "exec", "store")
 _DATA_SCALAR_KEYS = {"sources", "lake_dir"}
+_STORE_SCALAR_KEYS = {"root"}
 
 #: Venue-parameter section names allowed under ``[exec]``. ``miqmt`` is the
 #: short form used by the architecture baseline's assembly example and is an
@@ -331,10 +358,26 @@ def parse_toml_config(text: str, *, origin: str = "<string>") -> RunConfig:
 
     data_section = _parse_data_section(raw, origin)
     exec_section = _parse_exec_section(raw, origin)
+    store_section = _parse_store_section(raw, origin)
 
-    config = RunConfig(run=run_section, data=data_section, exec=exec_section)
+    config = RunConfig(
+        run=run_section, data=data_section, exec=exec_section, store=store_section
+    )
     _check_mode_venue_pairing(config, origin)
     return config
+
+
+def _parse_store_section(raw: Mapping[str, Any], origin: str) -> StoreSection:
+    """Parse the optional ``[store]`` section (unified-store assembly)."""
+    section = raw.get("store")
+    if section is None:
+        return StoreSection()
+    if not isinstance(section, Mapping):
+        raise ConfigError(f"{origin}: [store] must be a table of store settings")
+    try:
+        return StoreSection(**section)
+    except ValidationError as exc:
+        raise ConfigError(f"{origin}: invalid [store] section: {_summary(exc)}") from exc
 
 
 def _parse_data_section(raw: Mapping[str, Any], origin: str) -> DataSection:

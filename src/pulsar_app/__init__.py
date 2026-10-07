@@ -3,7 +3,10 @@
 One run = configuration + assembly + archive. This package owns the TOML
 run-configuration schema and validation, the plugin registry, the assembler
 that resolves configured plugins into port instances, the RunManifest
-archive and the research/paper/live CLI skeleton.
+archive, the research/paper/live CLI skeleton and — since STORE1 — the
+unified workspace store (versioned objects, the Agent write interface
+and the custom-code assembly seam into pulsar-core's registries;
+:mod:`pulsar_app.store`).
 
 It deliberately contains no domain logic and no port implementations; the
 port protocols and domain objects come from ``pulsar-contracts``, plugin
@@ -22,6 +25,7 @@ from .config import (
     RunConfig,
     RunMode,
     RunSection,
+    StoreSection,
     Venue,
     load_config,
     parse_toml_config,
@@ -33,11 +37,23 @@ from .errors import (
     PluginError,
     PortConformanceError,
     PulsarAppError,
+    StoreBackendError,
+    StoreError,
+    StoreNotFoundError,
+    StoreTamperedError,
+    StoreValidationError,
     UnknownPluginError,
 )
-from .manifest import ResolvedPlugins, RunManifest, collect_code_versions, config_fingerprint
+from .manifest import (
+    ResolvedPlugins,
+    RunManifest,
+    StoreObjectRecord,
+    collect_code_versions,
+    config_fingerprint,
+)
 from .registry import DEFAULT_REGISTRY, PluginKind, PluginRegistry, PluginSpec
 from .run import RunOutcome, execute_run
+from .store import Namespace, Store, content_hash
 
 try:
     __version__ = version("pulsar-app")
@@ -54,6 +70,7 @@ __all__ = [
     "RunConfig",
     "RunMode",
     "RunSection",
+    "StoreSection",
     "Venue",
     "load_config",
     "parse_toml_config",
@@ -72,8 +89,13 @@ __all__ = [
     # manifest
     "ResolvedPlugins",
     "RunManifest",
+    "StoreObjectRecord",
     "collect_code_versions",
     "config_fingerprint",
+    # unified store (STORE1)
+    "Namespace",
+    "Store",
+    "content_hash",
     # errors
     "PulsarAppError",
     "ConfigError",
@@ -82,4 +104,9 @@ __all__ = [
     "DuplicatePluginError",
     "PortConformanceError",
     "LiveModeLockedError",
+    "StoreError",
+    "StoreValidationError",
+    "StoreNotFoundError",
+    "StoreTamperedError",
+    "StoreBackendError",
 ]

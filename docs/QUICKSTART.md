@@ -8,24 +8,32 @@
 ## 0. 本地布局约定
 
 Pulsar 是六仓多包拓扑，建议把"代码"与"数据/配置/产物"放进同一个工作区、
-不同子目录（数据湖与 runs 产物**不进任何仓库**）：
+不同子目录（数据湖与 runs 产物**不进任何仓库**）。统一存储引擎（STORE1）
+落地后，工作区是**四层分离**布局：代码库（git）/ 存储根（store）/ 数据湖
+（lake）/ 运行产物（runs），四层各管各的版本化：
 
 ```text
 pulsar-workspace/                # 演练工作区（任意名字）
-├── repos/                       # 六仓克隆（代码区）
+├── repos/                       # 第一层：六仓克隆（代码区，git 管版本）
 │   ├── pulsar-contracts/        # 端口契约 + 发布锁定清单（tools/release/）
 │   ├── pulsar-core/             # 核心引擎（因子/实验/回测）
 │   ├── pulsar-data/             # 数据源适配 + 数据湖 + 回填 CLI
 │   ├── pulsar-exec/             # 执行端口实现（回测撮合/模拟）
 │   ├── pulsar-app/              # 运行时装配 + CLI（本文档所在仓）
 │   └── pulsar-ui/               # 只读看板 + 静态报告
-├── experiments/                 # 你的实验 TOML（模型注册表，建议 git 管理）
+├── store/                       # 第二层：统一存储根（STORE1）
+│   ├── catalog.db               #   SQLite catalog（名字/版本/声明注册名/路径引用）
+│   └── objects/                 #   内容寻址对象（sha256 扇出目录）
 ├── data/
-│   ├── lake/                    # 本地数据湖（Parquet 分区）
+│   ├── lake/                    # 第三层：本地数据湖（Parquet 分区）
 │   └── backfill-report.json     # 入湖完整性报告
-├── runs/                        # 每次 run 的三工件 + report.html
+├── runs/                        # 第四层：每次 run 的三工件 + report.html
 └── .venv/                       # 虚拟环境
 ```
+
+要点：`store/` 里放**实验 TOML 与自定义代码**（内容寻址、带历史与回滚），
+`lake/` 与 `runs/` 目录**不迁移**——catalog 只记录它们的绝对路径引用。
+`experiments/` 散文件目录的老用法仍然可用（§3、§7），但推荐新工作走 store。
 
 克隆六仓：
 
@@ -164,7 +172,73 @@ app 级 RunManifest，再做实验训练 + 回测并落三工件）：
 看板消费的就是上面三工件与数据湖目录，别无依赖；API 见
 `GET /api/runs`、`/api/runs/{id}/equity|trades|manifest`、`/api/lake/coverage`。
 
-## 5. 添加自定义因子（本地克隆里写代码 + 注册）
+## 5. 统一存储与 Agent 写入接口（pulsar store）
+
+`store/` 是工作区的**统一存储根**：实验配置（`experiments`）与自定义代码
+（`code`）作为内容寻址对象存入（sha256，同名多版本、可回滚、读取时校验
+hash 防篡改）；数据湖与 runs 目录用 `attach` 纳入 catalog 索引（只记路径，
+不迁移目录）。写入一律**先校验后落盘**：代码做语法编译 + import 白名单扫描
+（`os`/`subprocess`/网络等危险面在硬拒绝清单上，白名单 = numpy/pandas/
+math/typing/pulsar_core 公共 API 等，配置处 `PULSAR_STORE_IMPORT_WHITELIST`
+或 `pulsar_app.store.validation.DEFAULT_IMPORT_WHITELIST`）+ 注册名冲突检查
+（执行一次预览、比对核心注册表与存储内其它代码对象的声明名，随后回滚不留
+残留）；实验 TOML 校验语法、凭据基线与 C6 的 `status` 形状。
+
+```bash
+# 写入一个自定义因子（examples/store/custom_factor.py 是完整示例）
+.venv/bin/pulsar store put repos/pulsar-app/examples/store/custom_factor.py \
+    --namespace code --name custom_factor
+#   -> code/custom_factor seq=1 hash=9feb8e99855f created
+#      declares close_over_ma10 (factor)
+
+# 写入实验 TOML（examples/store/experiment.toml，引用了上面的自定义因子）
+.venv/bin/pulsar store put repos/pulsar-app/examples/store/experiment.toml \
+    --namespace experiments --name momentum_store_demo
+
+# 湖与 runs 目录纳入 catalog（只记路径引用）
+.venv/bin/pulsar store attach data/lake --namespace lake --name default
+.venv/bin/pulsar store attach runs --namespace runs --name default
+
+.venv/bin/pulsar store list                      # 四个命名空间一览
+.venv/bin/pulsar store history --namespace experiments --name momentum_store_demo
+.venv/bin/pulsar store rollback --namespace experiments --name momentum_store_demo --to 1
+.venv/bin/pulsar store get --namespace experiments --name momentum_store_demo \
+    --hash <完整sha256> --out recovered.toml      # 按 hash 取回同一版本
+```
+
+存储根默认 `./store`（或环境变量 `PULSAR_STORE_ROOT`），CLI 加 `--store` 可
+显式指定。Python API 与 CLI 完全同面：
+
+```python
+from pulsar_app.store import Store
+from pulsar_app.store.loader import materialize_code, load_experiment_object
+
+store = Store("store")
+version, created = store.put("code", "custom_factor", source_text)
+store.attach("lake", "default", "data/lake")
+
+materialize_code(store, "custom_factor")     # 校验后注册进 pulsar-core 注册表
+experiment = load_experiment_object(store, "momentum_store_demo")
+```
+
+### 5.1 从 store 装配运行（RunManifest 引用对象 hash）
+
+app 级 run 配置加一段 `[store]`（示例 `examples/store/run_store.toml`）：
+
+```toml
+[store]
+root = "store"
+code = ["custom_factor"]                 # 先物化注册，再装配
+experiments = ["momentum_store_demo"]    # 内容 hash 钉进 RunManifest
+```
+
+`pulsar research` 装配时先把 `code` 列表里的对象按 hash 校验、物化并注册进
+核心注册表（因子/模型器/预处理/组合/universe 五张表），再把 code 与
+experiments 对象的 `(namespace, name, sha256, seq)` 写进 RunManifest 的
+`store_objects` 段。**复现**就是按 manifest 里的 hash 从 store 取回同一份
+字节——head 后来怎么变、回滚过几次都不影响。
+
+### 5.2 老路子仍然可用：本地克隆里写代码 + 注册
 
 因子是"代码 + 注册"层（不是配置层）。在**本地克隆**里写（不发布也能用，
 只要装成 editable；见下）：
@@ -190,10 +264,11 @@ register_factor(FactorDefinition(
 ```
 
 在你的运行入口 `import my_factors`（触发注册）后，实验 TOML 里
-`factors.names` 加 `"close_over_ma10"` 即用。改了核心代码想跑全套测试：
-`cd repos/pulsar-core && pip install -e ".[dev]" && pytest`。模型器
-（`modelers.py` 的 `MODEL_REGISTRY`）与 universe（`register_universe`）
-的扩展同一模式。
+`factors.names` 加 `"close_over_ma10"` 即用（与 §5 的 store 路子殊途同归：
+store 只是让"代码 + 配置"多了版本化、校验与按 hash 复现）。改了核心代码想
+跑全套测试：`cd repos/pulsar-core && pip install -e ".[dev]" && pytest`。模型器
+（`modelers.py` 的 `MODEL_REGISTRY`，或 `pulsar_core.register_model`）与
+universe（`register_universe`）的扩展同一模式。
 
 ## 6. ML 模型器与 GPU 训练（可选 extra：pulsar-core[ml]）
 

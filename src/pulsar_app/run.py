@@ -16,7 +16,12 @@ from typing import Mapping, NamedTuple
 
 from .assembly import assemble_run, collect_data_watermarks
 from .config import RunConfig
-from .manifest import ResolvedPlugins, RunManifest, collect_code_versions, config_fingerprint
+from .manifest import (
+    ResolvedPlugins,
+    RunManifest,
+    collect_code_versions,
+    config_fingerprint,
+)
 from .registry import DEFAULT_REGISTRY, PluginRegistry
 
 __all__ = [
@@ -60,6 +65,10 @@ def execute_run(
         ),
         data_watermarks=collect_data_watermarks(assembled),
         code_versions=collect_code_versions(),
+        store_objects={
+            f"{record.role}:{record.name}": record
+            for record in assembled.store_objects
+        },
     )
     path = manifest.write(runs_dir)
     return RunOutcome(manifest, path)

@@ -15,6 +15,11 @@ __all__ = [
     "DuplicatePluginError",
     "PortConformanceError",
     "LiveModeLockedError",
+    "StoreError",
+    "StoreValidationError",
+    "StoreNotFoundError",
+    "StoreTamperedError",
+    "StoreBackendError",
 ]
 
 
@@ -44,3 +49,32 @@ class PortConformanceError(PluginError):
 
 class LiveModeLockedError(PulsarAppError):
     """Live mode stayed locked: the unlock environment variable was absent or not confirmed."""
+
+
+class StoreError(PulsarAppError):
+    """Base class for every error raised deliberately by the store engine."""
+
+
+class StoreValidationError(StoreError):
+    """Content offered to the store failed a write-time check.
+
+    Syntax compilation, the import whitelist, experiment-document shape or
+    a registration-name conflict — the write is refused with a readable
+    message and nothing is persisted.
+    """
+
+
+class StoreNotFoundError(StoreError):
+    """The referenced namespace/name/version does not exist in the store."""
+
+
+class StoreTamperedError(StoreError):
+    """An object's bytes no longer match its content hash.
+
+    Content-addressed storage detects corruption on every read; a
+    mismatched object is never handed to validation or assembly.
+    """
+
+
+class StoreBackendError(StoreError):
+    """The storage backend refused or failed an object operation."""

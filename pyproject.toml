@@ -13,6 +13,11 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.5,<3",
     "pulsar-contracts @ git+https://github.com/vanzeph/pulsar-contracts.git@2e3e393",
+    # Architecture baseline dependency table: the runtime assembler is the
+    # one repository that knows the whole stack. pulsar-core became a base
+    # dependency with the unified store (STORE1), whose code assembly
+    # materializes stored modules into the core registries.
+    "pulsar-core @ git+https://github.com/vanzeph/pulsar-core.git@4bbd30110cc774e396de266ac2c0bd0857628684",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -33,12 +38,10 @@ dev = [
     "mypy>=1.8",
     "pandas-stubs>=2",
 ]
-# The delivered domain stack the e2e chain assembles (task A9): pinned to
-# the six-repo main heads under test; pulsar-contracts is pinned in
-# [project.dependencies] to the same short ref every downstream repo
-# declares (unified at 2e3e393 across core/exec/app/data).
+# The e2e chain additionally assembles the port implementations: pulsar-core
+# is pinned in [project.dependencies] (same short-ref convention, unified at
+# 2e3e393 for contracts); data/exec stay here alongside their fixtures.
 e2e = [
-    "pulsar-core @ git+https://github.com/vanzeph/pulsar-core.git@8e5620e0b86fd11a8ee872e60463bb8204fb7339",
     "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@99e093d247030eacbb185fc53cf7880fe266cfc0",
     "pulsar-exec @ git+https://github.com/vanzeph/pulsar-exec.git@ab94f1ff81cabf9342d55e562e8f2c56f1408e6d",
 ]
@@ -73,4 +76,10 @@ files = ["src"]
 
 [[tool.mypy.overrides]]
 module = "pulsar_contracts.*"
+ignore_missing_imports = true
+
+# The domain stack is an optional extra ([e2e]); the store loader imports
+# pulsar-core lazily and treats it as untyped from the base install's view.
+[[tool.mypy.overrides]]
+module = "pulsar_core.*"
 ignore_missing_imports = true

@@ -11,8 +11,14 @@ This repository is the assembly point of Pulsar's multi-repo topology. It owns:
   (`MarketDataPort` / `ExecutionPort` from
   [pulsar-contracts](https://github.com/vanzeph/pulsar-contracts)),
 - the **RunManifest** archive written for every run (configuration snapshot,
-  resolved plugin ids, data watermarks, code versions, seed),
-- the **CLI skeleton** with `research` / `paper` / `live` subcommands.
+  resolved plugin ids, data watermarks, code versions, seed, and — for runs
+  assembled from the store — the code/config object hashes),
+- the **unified workspace store** (task STORE1): versioned content-addressed
+  objects under four namespaces (`experiments` / `code` / `lake` / `runs`),
+  an Agent write interface (CLI + Python API) with write-time validation,
+  and the custom-code assembly seam that registers stored factors/modelers
+  into the pulsar-core registries,
+- the **CLI** with `research` / `paper` / `live` and `store` subcommands.
 
 It deliberately contains **no domain logic and no port implementations**;
 adapters live in their own repositories (`pulsar-data`, `pulsar-exec`) and
@@ -26,7 +32,9 @@ pip install .
 pip install -e .[dev]
 ```
 
-Python >= 3.11. Depends on `pydantic` and `pulsar-contracts` only.
+Python >= 3.11. Depends on `pydantic`, `pulsar-contracts` and
+`pulsar-core` (the architecture baseline's dependency table: the runtime
+assembler is the one repository that knows the whole stack).
 
 > **New here?** [`docs/QUICKSTART.md`](docs/QUICKSTART.md) walks a fresh
 > machine from a clean venv through data ingestion, a first experiment and
@@ -119,14 +127,24 @@ reproducibility is judged against.
 pulsar research --config runs/dualma.toml [--runs-dir runs]
 pulsar paper   --config runs/paper.toml
 pulsar live    --config runs/live.toml      # requires the unlock env var
+
+pulsar store put my_factors.py --namespace code --name my_factors   # Agent write
+pulsar store list [--namespace experiments]
+pulsar store history --namespace code --name my_factors
+pulsar store rollback --namespace experiments --name demo --to 1
+pulsar store get --namespace code --name my_factors [--hash <sha256>]
+pulsar store attach data/lake --namespace lake --name default
 ```
 
-Exit codes: `0` success, `1` unexpected error, `2` configuration error,
-`3` live mode locked, `4` plugin resolution failure.
+Exit codes: `0` success, `1` unexpected error, `2` configuration or store
+validation error, `3` live mode locked, `4` plugin resolution failure.
 
 The subcommand injects `run.mode`; a configuration declaring a different
 mode is rejected. The CLI resolves plugins against the process-wide default
-registry — import your adapter packages first to populate it.
+registry — import your adapter packages first to populate it. Store writes
+are validated before anything is persisted (syntax compilation, import
+whitelist, registration-name conflicts; experiments get the C6 status
+shape); the store root defaults to `$PULSAR_STORE_ROOT` or `./store`.
 
 ## Repository layout
 
@@ -137,11 +155,18 @@ exactly one package):
 src/pulsar_app/
     config.py      # TOML schema, parsing, credential baseline
     registry.py    # plugin registry
-    assembly.py    # assembler, live gate, watermarks
-    manifest.py    # RunManifest, fingerprints, code versions
+    assembly.py    # assembler, live gate, watermarks, store materialization
+    manifest.py    # RunManifest, fingerprints, code versions, store objects
     run.py         # one-run lifecycle skeleton (dry run + archive)
-    cli.py         # research / paper / live
-examples/runs/     # example configurations
+    cli.py         # research / paper / live / store
+    store/         # unified workspace store (task STORE1)
+        engine.py      # Store facade: put/get/history/rollback/attach
+        catalog.py     # SQLite catalog (names, versions, declared names)
+        backend.py     # object backends (local disk now; R2/COS interface only)
+        validation.py  # write-time checks: syntax, import whitelist, C6 shape
+        loader.py      # code preview/materialize/registration into pulsar-core
+examples/runs/     # example run configurations
+examples/store/    # example store assets (custom factor + experiment TOML)
 tests/             # pytest suite (mock ports live here, never in the package)
 tests/e2e/         # free-source end-to-end acceptance chain (task A9)
 tools/             # offline maintenance scripts

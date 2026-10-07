@@ -20,7 +20,7 @@ from pulsar_contracts import ExecutionPort, MarketDataPort
 
 from .config import MODE_TO_VENUE, RunConfig, RunMode, resolve_env_refs
 from .errors import ConfigError, LiveModeLockedError, PluginError, PortConformanceError
-from .manifest import config_fingerprint, new_run_id
+from .manifest import StoreObjectRecord, config_fingerprint, new_run_id
 from .registry import DEFAULT_REGISTRY, PluginKind, PluginRegistry
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     "SupportsWatermark",
     "assemble_run",
     "collect_data_watermarks",
+    "assemble_store_objects",
 ]
 
 
@@ -50,6 +51,7 @@ class AssembledRun:
     market_data: MarketDataPort
     backup_market_data: tuple[MarketDataPort, ...]
     execution: ExecutionPort
+    store_objects: tuple[StoreObjectRecord, ...] = ()
 
     def all_market_data(self) -> tuple[MarketDataPort, ...]:
         """Data ports in configured primary/backup order."""
@@ -98,6 +100,7 @@ def assemble_run(
         for source_id in config.data.sources
     ]
     execution = _build_execution(config, registry, environment)
+    store_objects = assemble_store_objects(config)
 
     seed = config.run.seed
     fingerprint = config_fingerprint(config.model_dump(mode="json"), seed)
@@ -110,7 +113,55 @@ def assemble_run(
         market_data=ports[0],
         backup_market_data=tuple(ports[1:]),
         execution=execution,
+        store_objects=store_objects,
     )
+
+
+def assemble_store_objects(config: RunConfig) -> tuple[StoreObjectRecord, ...]:
+    """Materialize the configured store code and pin object references.
+
+    The 自定义代码组装 seam: every name in ``[store].code`` is loaded
+    from the store root (hash-verified, statically re-checked) and
+    registered into the pulsar-core registries *before* the experiment
+    layer resolves any names; ``[store].experiments`` entries are pinned
+    by content hash so the RunManifest can reproduce the exact config
+    bytes. A run without a ``[store]`` section assembles nothing extra.
+    """
+    section = config.store
+    if not section.code and not section.experiments:
+        return ()
+    from .store.engine import Store
+    from .store.loader import materialize_code
+
+    store = Store(section.root)
+    records: list[StoreObjectRecord] = []
+    for name in section.code:
+        materialized = materialize_code(store, name)
+        head = store.resolve("code", name)
+        records.append(
+            StoreObjectRecord(
+                role="code",
+                namespace="code",
+                name=name,
+                content_hash=materialized.content_hash,
+                seq=head.seq,
+                note=head.note,
+            )
+        )
+    for name in section.experiments:
+        head = store.resolve("experiments", name)
+        store.get("experiments", name, content_hash=head.content_hash)
+        records.append(
+            StoreObjectRecord(
+                role="experiment",
+                namespace="experiments",
+                name=name,
+                content_hash=head.content_hash,
+                seq=head.seq,
+                note=head.note,
+            )
+        )
+    return tuple(records)
 
 
 def _check_live_gate(config: RunConfig, mode: RunMode, env: Mapping[str, str]) -> None:

@@ -24,3 +24,9 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Workspace artifacts (four-layer layout: never commit store roots,
+# lakes or run outputs)
+store/
+runs/
+data/

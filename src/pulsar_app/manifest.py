@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 __all__ = [
     "SCHEMA_VERSION",
     "ResolvedPlugins",
+    "StoreObjectRecord",
     "RunManifest",
     "collect_code_versions",
     "config_fingerprint",
@@ -45,6 +46,26 @@ class ResolvedPlugins(BaseModel):
     venue: str
 
 
+class StoreObjectRecord(BaseModel):
+    """One unified-store object this run assembled from (STORE1).
+
+    ``role`` distinguishes materialized code (registered into the
+    pulsar-core registries before assembly) from experiment configs whose
+    content hash is pinned for reproduce-by-hash. ``content_hash`` is the
+    SHA-256 of the exact bytes the run consumed — reproduction fetches
+    that hash from the store, never "whatever is head now".
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    role: Literal["code", "experiment"]
+    namespace: str
+    name: str
+    content_hash: str = Field(min_length=64, max_length=64)
+    seq: int = Field(ge=1)
+    note: str = ""
+
+
 class RunManifest(BaseModel):
     """Complete archive of one run (written next to the run artifacts)."""
 
@@ -60,6 +81,7 @@ class RunManifest(BaseModel):
     resolved_plugins: ResolvedPlugins
     data_watermarks: dict[str, dict[str, str]] = Field(default_factory=dict)
     code_versions: dict[str, str] = Field(default_factory=dict)
+    store_objects: dict[str, StoreObjectRecord] = Field(default_factory=dict)
 
     def canonical(self) -> str:
         """Canonical JSON form (sorted keys, compact) — the identity used for diffing."""
