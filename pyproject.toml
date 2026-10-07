@@ -42,7 +42,7 @@ dev = [
 # is pinned in [project.dependencies] (same short-ref convention, unified at
 # 2e3e393 for contracts); data/exec stay here alongside their fixtures.
 e2e = [
-    "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@99e093d247030eacbb185fc53cf7880fe266cfc0",
+    "pulsar-data @ git+https://github.com/vanzeph/pulsar-data.git@aeaaadee0eb52dc7995ab8f7c037588b7bb6bd8f",
     "pulsar-exec @ git+https://github.com/vanzeph/pulsar-exec.git@ab94f1ff81cabf9342d55e562e8f2c56f1408e6d",
 ]
 # Network-only extras for tools/make_e2e_fixtures.py (recording, never CI).
