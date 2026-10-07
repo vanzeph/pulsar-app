@@ -25,8 +25,9 @@ dist/
 .vscode/
 .DS_Store
 
-# Workspace artifacts (four-layer layout: never commit store roots,
-# lakes or run outputs)
-store/
-runs/
-data/
+# Workspace artifacts at the repo root (four-layer layout: never commit
+# store roots, lakes or run outputs). Anchored so the package's own
+# src/pulsar_app/store/, tests/store/ and examples/store/ stay tracked.
+/store/
+/runs/
+/data/

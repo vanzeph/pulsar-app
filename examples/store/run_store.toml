@@ -1,0 +1,22 @@
+# Example app run configuration using the unified store (task STORE1).
+#
+# The [store] section is the assembly seam: `pulsar research --config`
+# materializes the listed code objects (hash-verified, registered into
+# the pulsar-core registries), pins both the code and the experiment
+# object hashes into the RunManifest, and the run reproduces later by
+# fetching exactly those hashes back from the store.
+
+[run]
+mode = "research"
+
+[data]
+sources = ["akshare"]
+lake_dir = "data/lake"
+
+[exec]
+venue = "backtest"
+
+[store]
+root = "store"
+code = ["custom_factor"]                 # code namespace names
+experiments = ["momentum_store_demo"]    # experiments namespace names
